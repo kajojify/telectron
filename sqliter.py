@@ -74,7 +74,7 @@ class SQLiter:
             return self.cursor.execute('SELECT * FROM countries WHERE user="{0}"'.format(user_id)).fetchall()
 
 
-    def has_country(self, user_id):
+    def user_exists(self, user_id):
         self.cursor.execute('SELECT * FROM countries WHERE user={0}'.format(user_id))
         return bool(self.cursor.fetchall())
 

@@ -67,21 +67,22 @@ def get_full_schedule(dep_st_code, arr_st_code):
              'transport_types': 'suburban'}
     full_schedule_json = requests.get("https://api.rasp.yandex.net/v3.0/search/", params=query).json()
     all_subtrains = full_schedule_json['segments']
-    for i, subtrain in enumerate(all_subtrains, 1):
-        departure = subtrain['departure']
-        title = subtrain['thread']['title']
-        # except_days = subtrain['except_days']
-        arrival = subtrain['arrival']
-        duration = subtrain['duration']
-        stops = subtrain['stops']
-        # days = subtrain['days']
-        subtrain_str = "{0}. {1} ---  {2}  -  {3}.\n\n".format(i, title, departure, arrival)
-        # if except_days:
-        #     subtrain_str += "\nКроме дней: {}\n\n".format(except_days)
-        # else:
-        #     subtrain_str += "\n\n"
-        full_schedule_str += subtrain_str
-    return full_schedule_str
+
+    # for i, subtrain in enumerate(all_subtrains, 1):
+    #     departure = subtrain['departure']
+    #     title = subtrain['thread']['title']
+    #     # except_days = subtrain['except_days']
+    #     arrival = subtrain['arrival']
+    #     duration = subtrain['duration']
+    #     stops = subtrain['stops']
+    #     # days = subtrain['days']
+    #     subtrain_str = "{0}. {1} ---  {2}  -  {3}.\n\n".format(i, title, departure, arrival)
+    #     # if except_days:
+    #     #     subtrain_str += "\nКроме дней: {}\n\n".format(except_days)
+    #     # else:
+    #     #     subtrain_str += "\n\n"
+    #     full_schedule_str += subtrain_str
+    return all_subtrains
 
 
 def get_nearest_stations(latitude, longitude, radius):

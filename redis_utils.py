@@ -1,5 +1,8 @@
+import json
+
 import redis
 from telebot import types
+from sqliter import SQLiter
 
 import config
 import yandex_api
@@ -22,20 +25,21 @@ class StateChanger:
         else:
             raise ValueError
 
-    def go_into_state(self, user_id, state, arbitrary_response=None, **kwargs):
+    def go_into_state(self, user_id, state, arbitrary_response=None):
         self.set_state(user_id, state)
 
         text = self.get_bot_response(state, arbitrary_response)
 
         keyboard = self.keyboard.get_state_keyboard(state)
         self.bot.send_message(user_id, text, reply_markup=keyboard,
-                              parse_mode='markdown', **kwargs)
+                              parse_mode='markdown')
 
     #######################
     #######################
     #######################
     #######################
     # Custom state changers
+
     def already_set_direction(self, user_id, state):
         self.set_state(user_id, state)
         keyboard = types.InlineKeyboardMarkup()
@@ -61,7 +65,7 @@ class StateChanger:
         self.set_state(user_id, state)
 
         comeback = self.keyboard.get_additional_comeback_keyboard()
-        keyboard = self.keyboard.get_state_keyboard(state)
+        keyboard = self.keyboard.direction_input(state)
 
         responses = config.permitted_states[state]['message']
         self.bot.send_message(user_id, responses[0], reply_markup=comeback)
@@ -95,14 +99,11 @@ class StateChanger:
             inline_message_id=callback.inline_message_id,
             reply_markup=keyboard)
 
-    def check_values(self, user_id, state, **kwargs):
+    def check_values(self, user_id, state, stations):
         self.set_state(user_id, state)
-        stations = kwargs['stations']
-
-        responses = config.permitted_states[state]['message']
 
         if len(stations) == 0:
-            self.bot.send_message(user_id, responses[0])
+            self.bot.send_message(user_id, 'К сожалению, станция не найдена! Попробуйте снова.')
 
         elif len(stations) == 1:
             chosen_station = stations[0]
@@ -113,12 +114,9 @@ class StateChanger:
             else:
                 self.redis_storage.hset(user_id, 'dep_station', chosen_station['title'])
                 self.redis_storage.hset(user_id, 'dep_code', station_code)
-            if self.both_stations_set(user_id):
-                self.are_you_sure(user_id)
-            else:
-                self.go_into_state(user_id, 'new_route')
+            self.sure_station(user_id, state, chosen_station['title'])
         else:
-            self.clarify_direction(user_id, state, stations=stations)
+            self.clarify_direction(user_id, stations)
 
     def both_stations_set(self, user_id):
         if self.redis_storage.hexists(user_id, 'arr_code') and self.redis_storage.hexists(user_id, 'dep_code'):
@@ -126,30 +124,11 @@ class StateChanger:
         else:
             return False
 
-    def are_you_sure(self, user_id):
-
-        keyboard = types.InlineKeyboardMarkup()
-        keyboard.add(types.InlineKeyboardButton(text='Изменить', callback_data='Изменить'))
-        keyboard.add(types.InlineKeyboardButton(text='Подтвердить', callback_data='Подтвердить'))
-
-        inputt = """Проверьте введённые данные:
-                        *страна: *{0}
-                        *регион отправки: *{1}
-                        *станция отправки: *{2}
-                        *регион прибытия: *{3}
-                        *станция прибытия: *{4}
-        """.format(str(self.redis_storage.hget(user_id, 'country'), 'utf-8'),
-                    str(self.redis_storage.hget(user_id, 'dep_region'), 'utf-8'),
-                    str(self.redis_storage.hget(user_id, 'dep_station'), 'utf-8'),
-                    str(self.redis_storage.hget(user_id, 'arr_region'), 'utf-8'),
-                    str(self.redis_storage.hget(user_id, 'arr_station'), 'utf-8'))
-        self.bot.send_message(user_id, inputt, reply_markup=keyboard, parse_mode="markdown")
-
-
-    def clarify_direction(self, user_id, state, stations):
+    def clarify_direction(self, user_id, stations):
+        self.redis_storage.hset(user_id, 'stations', json.dumps(stations))
         keyboard = types.InlineKeyboardMarkup()
         keyboard.add(*[types.InlineKeyboardButton(text=station['direction'],
-                                                  callback_data=station['direction'])
+                                                  callback_data='D'+station['direction'])
                            for station in stations])
         self.bot.send_message(user_id, 'Выберете железнодорожную ветку вашей станции!', reply_markup=keyboard)
 
@@ -176,15 +155,49 @@ class StateChanger:
         longitude = location.longitude
         nearest_stations = yandex_api.get_nearest_stations(latitude,
                                                            longitude, self.geo_radius)
+        print(nearest_stations)
         stations = nearest_stations['stations']
         keyboard = types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(*[types.InlineKeyboardButton(text=station['title'], callback_data=station['code'])
+        keyboard.add(*[types.InlineKeyboardButton(text=station['title'], callback_data='gs'+station['code']+' ' + station['title'])
                        for station in stations])
         self.bot.send_message(user_id, 'В радиусе %d км найдены такие станции:' % self.geo_radius, reply_markup=keyboard)
 
+    def sure_station_geo(self, user_id, state, station_title):
+        self.set_state(user_id, state)
+
+        keyboard = types.InlineKeyboardMarkup()
+        keyboard.add(types.InlineKeyboardButton(text='Изменить', callback_data='Изменить'))
+        keyboard.add(types.InlineKeyboardButton(text='Подтвердить', callback_data='Подтвердить'))
+
+        direction = 'отправления' if state == 'sure_dep' else 'прибытия'
+        station_confirmation = "Ваша станция {0}:\n" \
+                               "*регион {0}*: согласно геопозиции\n" \
+                               "*станция {0}*: {1}".format(direction, station_title)
+        self.bot.send_message(user_id, station_confirmation, reply_markup=keyboard, parse_mode="markdown")
+
+    def sure_station(self, user_id, state, station_title):
+        keyboard = types.InlineKeyboardMarkup()
+        keyboard.add(types.InlineKeyboardButton(text='Изменить', callback_data='Изменить'))
+        keyboard.add(types.InlineKeyboardButton(text='Подтвердить', callback_data='Подтвердить'))
+
+        if state == 'specify_departure_station':
+            region = str(self.redis_storage.hget(user_id, 'dep_region'), 'utf-8')
+            direction = 'отправления'
+        else:
+            direction = 'прибытия'
+            region = str(self.redis_storage.hget(user_id, 'arr_region'), 'utf-8')
+
+        station_confirmation = "Ваша станция {0}:\n" \
+                               "*регион {0}*: {1}\n" \
+                               "*станция {0}*: {2}".format(direction, region, station_title)
+        self.bot.send_message(user_id, station_confirmation, reply_markup=keyboard, parse_mode="markdown")
+
+    def chose_subtrain(self, user_id, state, schedule):
+        pass
+
     @staticmethod
     def get_bot_response(state, response):
-        if response:
+        if response is not None:
             text = response
         else:
             text = config.permitted_states[state]['message']

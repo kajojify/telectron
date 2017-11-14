@@ -30,10 +30,9 @@ class Keyboard:
         keyboard.add(config.buttons['comeback'])
         return keyboard
 
-    ##################
-    ##################
-    ##################
-    ##################
+    #########################################
+    #########################################
+    #########################################
     # Custom keyboards
 
     def geostations(self):
@@ -47,6 +46,15 @@ class Keyboard:
         keyboard = types.InlineKeyboardMarkup(row_width=4)
         keyboard.row(*[types.InlineKeyboardButton(text=number + ' км', callback_data=number)
                        for number in ['-1', '-5', '+1', '+5']])
+        return keyboard
+
+    def direction_input(self, state):
+        keyboard = types.InlineKeyboardMarkup(row_width=2)
+        buttons = config.permitted_states[state]['buttons']
+        for i in range(3):
+            keyboard.row(types.InlineKeyboardButton(text=buttons[i], callback_data=buttons[i]))
+        keyboard.add(*[types.InlineKeyboardButton(text=button, callback_data=button)
+                       for button in buttons[3:]])
         return keyboard
 
     def specify_direction_region(self, buttons):
