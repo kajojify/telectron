@@ -61,28 +61,29 @@ def get_station_code(station, regions):
                     return st['codes']['yandex_code']
 
 
-def get_full_schedule(dep_st_code, arr_st_code):
+def output_full_schedule(dep_st_code, arr_st_code):
     full_schedule_str = ""
     query = {'apikey': yandex_apikey, 'from': dep_st_code, 'to': arr_st_code,
              'transport_types': 'suburban'}
     full_schedule_json = requests.get("https://api.rasp.yandex.net/v3.0/search/", params=query).json()
+    dep = full_schedule_json['search']['from']['title']
+    arr = full_schedule_json['search']['to']['title']
     all_subtrains = full_schedule_json['segments']
-
-    # for i, subtrain in enumerate(all_subtrains, 1):
-    #     departure = subtrain['departure']
-    #     title = subtrain['thread']['title']
-    #     # except_days = subtrain['except_days']
-    #     arrival = subtrain['arrival']
-    #     duration = subtrain['duration']
-    #     stops = subtrain['stops']
-    #     # days = subtrain['days']
-    #     subtrain_str = "{0}. {1} ---  {2}  -  {3}.\n\n".format(i, title, departure, arrival)
-    #     # if except_days:
-    #     #     subtrain_str += "\nКроме дней: {}\n\n".format(except_days)
-    #     # else:
-    #     #     subtrain_str += "\n\n"
-    #     full_schedule_str += subtrain_str
-    return all_subtrains
+    for subtrain in all_subtrains:
+        departure_time = subtrain['departure']
+        except_days = subtrain['except_days']
+        arrival_time = subtrain['arrival']
+        from_station = subtrain['from']['title']
+        to_station = subtrain['to']['title']
+        days = subtrain['days']
+        title = subtrain['thread']['title']
+        duration = subtrain['duration']
+        stops = subtrain['stops']
+        when = '\n*Когда:* {0}'.format(days) + (', кроме {0}.\n\n'.format(except_days) if except_days else '.\n\n')
+        subtrain_str = "*Следование:* {0}\n {1}     {2}\n{3}  -  {4}".format(title, dep, arr, departure_time, arrival_time)
+        subtrain_str += when
+        full_schedule_str += subtrain_str
+    return full_schedule_str
 
 
 def get_nearest_stations(latitude, longitude, radius):

@@ -30,6 +30,22 @@ def my_routes(message):
     changer.go_into_state(message.from_user.id, 'my_routes')
 
 
+@bot.message_handler(func=lambda m: changer.get_state(m.from_user.id) == "my_routes" and
+                     m.text != config.buttons['comeback'])
+def specify_radius(message):
+    try:
+        route_number = int(message.text)
+    except ValueError:
+        bot.send_message(message.from_user.id, 'Неверно указан номер маршрута!\nПопробуйте снова.')
+    else:
+        changer.specific_route(message.from_user.id, route_number=route_number)
+
+
+@bot.message_handler(func=lambda m: m.text == config.buttons['notifications'] and
+                     changer.get_state(m.from_user.id) == "main_menu")
+def my_routes(message):
+    changer.go_into_state(message.from_user.id, 'notifications')
+
 #########################################
 ############ settings ############
 
@@ -46,7 +62,7 @@ def settings(message):
 
 
 @bot.callback_query_handler(func=lambda c: c.data in config.countries and
-                            changer.get_state(c.from_user.id) == "settings")
+                            changer.get_state(c.from_user.id) == "change_country")
 def change_country(c):
     country = c.data[3:]  # Удаляем флаг
     changer.redis_storage.hset(c.from_user.id, 'country', country)
@@ -254,42 +270,30 @@ def inline(c):
         changer.redis_storage.hset(c.from_user.id, 'dep_station', chosen_station['title'])
         changer.redis_storage.hset(c.from_user.id, 'dep_code', station_code)
 
-    if changer.both_stations_set(c.from_user.id):
-        changer.are_you_sure(c.from_user.id)
-    else:
-        changer.go_into_state(c.from_user.id, 'new_route')
+    changer.sure_station(c.from_user.id, changer.get_state(c.from_user.id), chosen_station['title'])
 
 
 @bot.callback_query_handler(func=lambda c: c.data == 'Изменить')
 def inline(c):
-    bot.send_message(c.from_user.id, "Ведутся работы!")
+    state = changer.get_state(c.from_user.id)
+    if state == 'specify_radius_dep':
+        changer.specify_radius(c.from_user.id, state)
+    elif state == 'specify_radius_arr':
+        changer.specify_radius(c.from_user.id, state)
+    elif state == 'sure_arr':
+        changer.go_into_state(c.from_user.id, 'departure')
+    else:
+        changer.go_into_state(c.from_user.id, 'arrival')
+
 
 @bot.callback_query_handler(func=lambda c: c.data == 'Подтвердить')
 def inline(c):
     if changer.both_stations_set(c.from_user.id):
-        changer.set_state(c.from_user.id, 'choose_subtrain')
-        arrcode = str(changer.redis_storage.hget(c.from_user.id, 'arr_code'), 'utf-8')
-        depcode = str(changer.redis_storage.hget(c.from_user.id, 'dep_code'), 'utf-8')
-        schedule = yandex_api.get_full_schedule(depcode, arrcode)
-        full_schedule_str = ''
-        for i, subtrain in enumerate(schedule, 1):
-            departure = subtrain['departure']
-            title = subtrain['thread']['title']
-            # except_days = subtrain['except_days']
-            arrival = subtrain['arrival']
-            duration = subtrain['duration']
-            stops = subtrain['stops']
-            # days = subtrain['days']
-            subtrain_str = "{0}. {1} ---  {2}  -  {3}.\n\n".format(i, title, departure, arrival)
-            full_schedule_str += subtrain_str
-        changer.redis_storage.hset(c.from_user.id, 'schedule', json.dumps(schedule))
-        dep_station = str(changer.redis_storage.hget(c.from_user.id, 'dep_station'), 'utf-8')
         arr_station = str(changer.redis_storage.hget(c.from_user.id, 'arr_station'), 'utf-8')
-        changer.redis_storage.hdel(c.from_user.id, 'arr_code', 'dep_code')
-        bot.send_message(c.from_user.id, 'Поехали! {} -- {}. \n\n{}'.format(dep_station,
-                                                                            arr_station, full_schedule_str),
-                         parse_mode='markdown')
+        dep_station = str(changer.redis_storage.hget(c.from_user.id, 'dep_station'), 'utf-8')
+        bot_response = "Задан маршрут *{0}* - *{1}*.".format(dep_station, arr_station)
 
+        changer.create_route(c.from_user.id, bot_response)
     else:
         if changer.get_state(c.from_user.id) == 'sure_dep':
             new_response = "А теперь укажите *станция отправления*."
@@ -303,29 +307,49 @@ def inline(c):
         else:
             new_response = "А теперь укажите *станцию отправления*."
             changer.go_into_state(c.from_user.id, 'new_route', arbitrary_response=new_response)
-    # user_id = c.from_user.id
-    # changer.set_state(user_id, "print_schedule")
-    # arrcode = str(changer.redis_storage.hget(user_id, 'arr_code'), 'utf-8')
-    # depcode = str(changer.redis_storage.hget(user_id, 'dep_code'), 'utf-8')
-    # country = str(changer.redis_storage.hget(user_id, 'country'), 'utf-8')
-    # dep_region = str(changer.redis_storage.hget(user_id, 'dep_region'), 'utf-8')
-    # arr_region = str(changer.redis_storage.hget(user_id, 'arr_region'), 'utf-8')
-    # dep_station = str(changer.redis_storage.hget(user_id, 'dep_station'), 'utf-8')
-    # arr_station = str(changer.redis_storage.hget(user_id, 'arr_station'), 'utf-8')
-    #
-    # schedule = yandex_api.get_full_schedule(depcode, arrcode)
-    # changer.redis_storage.hset(user_id, 'full_schedule', schedule)
-    # bot.send_message(user_id, schedule)
 
-@bot.message_handler(func=lambda m: changer.get_state(m.from_user.id) == 'choose_subtrain')
-def specify_station(message):
-    try:
-        subtrain_number = int(message.text)
-    except ValueError:
-        bot.send_message(message.from_user.id, 'Неверно указан номер электрички!\nПопробуйте снова.')
-    else:
-        schedule = json.loads(str(changer.redis_storage.hget(message.from_user.id, 'schedule'), 'utf-8'))
-        bot.send_message(message.from_user.id, json.dumps(schedule[subtrain_number]))
+
+@bot.message_handler(func=lambda m: m.text == config.buttons['schedule'] and
+                     changer.get_state(m.from_user.id) == "created_route")
+def settings(message):
+    changer.go_into_state(message.from_user.id, 'schedule')
+
+
+@bot.message_handler(func=lambda m: m.text == config.buttons['nearest'] and
+                     changer.get_state(m.from_user.id) == "schedule")
+def settings(message):
+    bot.send_message(message.from_user.id, 'Ближайшее!')
+
+
+@bot.message_handler(func=lambda m: m.text == config.buttons['today'] and
+                     changer.get_state(m.from_user.id) == "schedule")
+def settings(message):
+    bot.send_message(message.from_user.id, 'Расписание на сегодня!')
+
+
+@bot.message_handler(func=lambda m: m.text == config.buttons['tomorrow'] and
+                     changer.get_state(m.from_user.id) == "schedule")
+def settings(message):
+    bot.send_message(message.from_user.id, 'Расписание на завтра!')
+
+
+@bot.message_handler(func=lambda m: m.text == config.buttons['entire'] and
+                     changer.get_state(m.from_user.id) == "schedule")
+def settings(message):
+    changer.go_into_state(message.from_user.id, 'entire_schedule')
+
+
+@bot.callback_query_handler(func=lambda c: c.data == 'добавить')
+def inline(c):
+    route_key = 'routes:' + str(c.from_user.id)
+    arr = str(changer.redis_storage.hget(c.from_user.id, 'arr_station'), 'utf-8')
+    dep = str(changer.redis_storage.hget(c.from_user.id, 'dep_station'), 'utf-8')
+    arr_code = str(changer.redis_storage.hget(c.from_user.id, 'arr_code'), 'utf-8')
+    dep_code = str(changer.redis_storage.hget(c.from_user.id, 'dep_code'), 'utf-8')
+    route = {'arr_station': arr, 'dep_station': dep, 'arr_code': arr_code, 'dep_code': dep_code}
+    changer.redis_storage.rpush(route_key, json.dumps(route))
+
+
 
 if __name__ == '__main__':
     bot.polling(none_stop=True)

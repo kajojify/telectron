@@ -2,11 +2,11 @@ import json
 
 import redis
 from telebot import types
-from sqliter import SQLiter
 
 import config
 import yandex_api
 from keyboard import Keyboard
+from text_changer import Text
 
 
 class StateChanger:
@@ -15,6 +15,7 @@ class StateChanger:
         self.geo_radius = 5
         self.keyboard = Keyboard()
         self.redis_storage = redis.StrictRedis()
+        self.text = Text(self.redis_storage)
 
     def get_state(self, user_id):
         return str(self.redis_storage.hget(user_id, 'state'), 'utf-8')
@@ -28,7 +29,7 @@ class StateChanger:
     def go_into_state(self, user_id, state, arbitrary_response=None):
         self.set_state(user_id, state)
 
-        text = self.get_bot_response(state, arbitrary_response)
+        text = self.text.get_bot_text(user_id, state, arbitrary_response)
 
         keyboard = self.keyboard.get_state_keyboard(state)
         self.bot.send_message(user_id, text, reply_markup=keyboard,
@@ -45,6 +46,7 @@ class StateChanger:
         keyboard = types.InlineKeyboardMarkup()
         keyboard.add(types.InlineKeyboardButton(text='Всё равно продолжить',
                                                 callback_data='Всё равно продолжить'))
+
 
         text = config.permitted_states[state]['message']
         self.bot.send_message(user_id, text, reply_markup=keyboard, parse_mode="markdown")
@@ -68,7 +70,8 @@ class StateChanger:
         keyboard = self.keyboard.direction_input(state)
 
         responses = config.permitted_states[state]['message']
-        self.bot.send_message(user_id, responses[0], reply_markup=comeback)
+        self.bot.send_message(user_id, responses[0], reply_markup=comeback,
+                              parse_mode='markdown')
         self.bot.send_message(user_id, responses[1], reply_markup=keyboard)
 
     def specify_direction_region(self, user_id, state):
@@ -155,7 +158,7 @@ class StateChanger:
         longitude = location.longitude
         nearest_stations = yandex_api.get_nearest_stations(latitude,
                                                            longitude, self.geo_radius)
-        print(nearest_stations)
+
         stations = nearest_stations['stations']
         keyboard = types.InlineKeyboardMarkup(row_width=1)
         keyboard.add(*[types.InlineKeyboardButton(text=station['title'], callback_data='gs'+station['code']+' ' + station['title'])
@@ -163,6 +166,7 @@ class StateChanger:
         self.bot.send_message(user_id, 'В радиусе %d км найдены такие станции:' % self.geo_radius, reply_markup=keyboard)
 
     def sure_station_geo(self, user_id, state, station_title):
+        print(state)
         self.set_state(user_id, state)
 
         keyboard = types.InlineKeyboardMarkup()
@@ -192,13 +196,24 @@ class StateChanger:
                                "*станция {0}*: {2}".format(direction, region, station_title)
         self.bot.send_message(user_id, station_confirmation, reply_markup=keyboard, parse_mode="markdown")
 
-    def chose_subtrain(self, user_id, state, schedule):
-        pass
+    def create_route(self, user_id, bot_response):
+        state = 'created_route'
+        self.set_state(user_id, state)
+        ad_keyboard = types.InlineKeyboardMarkup()
+        ad_keyboard.add(types.InlineKeyboardButton(text='Добавить в Мои маршруты',
+                                                callback_data='добавить'))
 
-    @staticmethod
-    def get_bot_response(state, response):
-        if response is not None:
-            text = response
-        else:
-            text = config.permitted_states[state]['message']
-        return text
+        keyboard = self.keyboard.create_route(state)
+        self.bot.send_message(user_id, bot_response, reply_markup=ad_keyboard,
+                              parse_mode='markdown')
+        self.bot.send_message(user_id, 'Что Вас интересует?', reply_markup=keyboard,
+                              parse_mode='markdown')
+
+    def specific_route(self, user_id, route_number):
+        state = 'specific_route'
+        self.set_state(user_id, state)
+        text = self.text.get_bot_text(user_id, state, route_number=route_number)
+
+        keyboard = self.keyboard.get_state_keyboard(state)
+        self.bot.send_message(user_id, text, reply_markup=keyboard,
+                              parse_mode='markdown')

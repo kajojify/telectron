@@ -68,3 +68,8 @@ class Keyboard:
         keyboard.add(*[types.InlineKeyboardButton(text=region['title'], callback_data="R" + region['title'])
                        for region in buttons])
         return keyboard
+
+    def create_route(self, state):
+        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
+        keyboard.add(*config.permitted_states[state]['buttons'])
+        return keyboard
