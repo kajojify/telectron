@@ -1,5 +1,6 @@
 yandex_apikey = ""
 bot_token = ""
+google_apikey = ""
 
 
 flags = {
@@ -230,7 +231,16 @@ permitted_states = {
     'entire_schedule': {'keyboard': 'reply',
                         'buttons': [buttons['set_notifications'], buttons['comeback']]},
 
+    'today_schedule': {'keyboard': 'reply',
+                       'buttons': [buttons['set_notifications'], buttons['comeback']]},
+
+    'tomorrow_schedule': {'keyboard': 'reply',
+                          'buttons': [buttons['set_notifications'], buttons['comeback']]},
+
     'routes': {},
+
+    'nearest_schedule': {'keyboard': 'reply',
+                          'buttons': [buttons['set_notifications'], buttons['comeback']]},
 
     'specific_route': {'keyboard': 'none'}
     }

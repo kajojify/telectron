@@ -1,5 +1,6 @@
 import json
 import requests
+from datetime import datetime
 
 from config import country_numbers, yandex_apikey
 
@@ -53,37 +54,58 @@ def give_me_stations_by_name(station_title, region):
     return stations_list
 
 
-def get_station_code(station, regions):
-    for r in regions:
-        for s in r['settlements']:
-            for st in s['stations']:
-                if st['title'] == station:
-                    return st['codes']['yandex_code']
-
-
-def output_full_schedule(dep_st_code, arr_st_code):
+def output_full_schedule(dep_st_code, arr_st_code, date=None):
     full_schedule_str = ""
     query = {'apikey': yandex_apikey, 'from': dep_st_code, 'to': arr_st_code,
              'transport_types': 'suburban'}
+    if not isinstance(date, datetime):
+        raise TypeError('Аргумент date должен быть объектом класса datetime.datetime!')
+    if date is not None:
+        query['date'] = date.strftime("%Y-%m-%d")
     full_schedule_json = requests.get("https://api.rasp.yandex.net/v3.0/search/", params=query).json()
     dep = full_schedule_json['search']['from']['title']
     arr = full_schedule_json['search']['to']['title']
     all_subtrains = full_schedule_json['segments']
     for subtrain in all_subtrains:
-        departure_time = subtrain['departure']
-        except_days = subtrain['except_days']
-        arrival_time = subtrain['arrival']
+        departure_time = subtrain['departure'][:-6].split('T')[1]
+        # except_days = subtrain['except_days']
+        arrival_time = subtrain['arrival'][:-6].split('T')[1]
         from_station = subtrain['from']['title']
         to_station = subtrain['to']['title']
-        days = subtrain['days']
+        # days = subtrain['days']
         title = subtrain['thread']['title']
         duration = subtrain['duration']
         stops = subtrain['stops']
-        when = '\n*Когда:* {0}'.format(days) + (', кроме {0}.\n\n'.format(except_days) if except_days else '.\n\n')
-        subtrain_str = "*Следование:* {0}\n {1}     {2}\n{3}  -  {4}".format(title, dep, arr, departure_time, arrival_time)
-        subtrain_str += when
+        # when = '\n*Когда:* {0}'.format(days) + (', кроме {0}.\n\n'.format(except_days) if except_days else '.\n\n')
+        subtrain_str = "\n*Следование:* {0}\n {1}     {2}\n{3}  -  {4}\n".format(title, dep, arr, departure_time, arrival_time)
+        # subtrain_str += when
         full_schedule_str += subtrain_str
     return full_schedule_str
+
+def nearest_full_schedule(dep_st_code, arr_st_code, date):
+    full_schedule_str = ""
+    if not isinstance(date, datetime):
+        raise TypeError('Аргумент date должен быть объектом класса datetime.datetime!')
+    query = {'apikey': yandex_apikey, 'from': dep_st_code, 'to': arr_st_code,
+             'transport_types': 'suburban', 'date': date.strftime("%Y-%m-%d")}
+
+    full_schedule_json = requests.get("https://api.rasp.yandex.net/v3.0/search/", params=query).json()
+    dep = full_schedule_json['search']['from']['title']
+    arr = full_schedule_json['search']['to']['title']
+    all_subtrains = full_schedule_json['segments']
+    for subtrain in all_subtrains:
+        departure_time = datetime.strptime(subtrain['departure'][:-6], "%Y-%m-%dT%H:%M:%S")
+        if date > departure_time:
+            continue
+
+        departure_time = subtrain['departure'][:-6].split('T')[1]
+        arrival_time = subtrain['arrival'][:-6].split('T')[1]
+
+        title = subtrain['thread']['title']
+
+        subtrain_str = "\n*Следование:* {0}\n {1}     {2}\n{3}  -  {4}\n".format(title, dep, arr, departure_time, arrival_time)
+        full_schedule_str += subtrain_str
+    return full_schedule_str if full_schedule_str else 'Все уехали :)'
 
 
 def get_nearest_stations(latitude, longitude, radius):

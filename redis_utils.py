@@ -117,6 +117,9 @@ class StateChanger:
             else:
                 self.redis_storage.hset(user_id, 'dep_station', chosen_station['title'])
                 self.redis_storage.hset(user_id, 'dep_code', station_code)
+                latitude, longitude = chosen_station['latitude'], chosen_station['longitude']
+                self.redis_storage.hset(user_id, 'latitude', latitude)
+                self.redis_storage.hset(user_id, 'longitude', longitude)
             self.sure_station(user_id, state, chosen_station['title'])
         else:
             self.clarify_direction(user_id, stations)
@@ -161,7 +164,7 @@ class StateChanger:
 
         stations = nearest_stations['stations']
         keyboard = types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(*[types.InlineKeyboardButton(text=station['title'], callback_data='gs'+station['code']+' ' + station['title'])
+        keyboard.add(*[types.InlineKeyboardButton(text=station['title'], callback_data='gs'+station['code']+ ' ' + station['title'])
                        for station in stations])
         self.bot.send_message(user_id, 'В радиусе %d км найдены такие станции:' % self.geo_radius, reply_markup=keyboard)
 

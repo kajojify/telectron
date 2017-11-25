@@ -263,12 +263,15 @@ def inline(c):
             chosen_station = station
             break
     station_code = chosen_station['codes']['yandex_code']
+
     if changer.get_state(c.from_user.id) == 'specify_arrival_station':
         changer.redis_storage.hset(c.from_user.id, 'arr_station', chosen_station['title'])
         changer.redis_storage.hset(c.from_user.id, 'arr_code', station_code)
     else:
         changer.redis_storage.hset(c.from_user.id, 'dep_station', chosen_station['title'])
-        changer.redis_storage.hset(c.from_user.id, 'dep_code', station_code)
+        latitude, longitude = chosen_station['latitude'], chosen_station['longitude']
+        changer.redis_storage.hset(c.from_user.id, 'latitude', latitude)
+        changer.redis_storage.hset(c.from_user.id, 'longitude', longitude)
 
     changer.sure_station(c.from_user.id, changer.get_state(c.from_user.id), chosen_station['title'])
 
@@ -318,19 +321,19 @@ def settings(message):
 @bot.message_handler(func=lambda m: m.text == config.buttons['nearest'] and
                      changer.get_state(m.from_user.id) == "schedule")
 def settings(message):
-    bot.send_message(message.from_user.id, 'Ближайшее!')
+    changer.go_into_state(message.from_user.id, 'nearest_schedule')
 
 
 @bot.message_handler(func=lambda m: m.text == config.buttons['today'] and
                      changer.get_state(m.from_user.id) == "schedule")
 def settings(message):
-    bot.send_message(message.from_user.id, 'Расписание на сегодня!')
+    changer.go_into_state(message.from_user.id, 'today_schedule')
 
 
 @bot.message_handler(func=lambda m: m.text == config.buttons['tomorrow'] and
                      changer.get_state(m.from_user.id) == "schedule")
 def settings(message):
-    bot.send_message(message.from_user.id, 'Расписание на завтра!')
+    changer.go_into_state(message.from_user.id, 'tomorrow_schedule')
 
 
 @bot.message_handler(func=lambda m: m.text == config.buttons['entire'] and

@@ -1,6 +1,10 @@
 import config
 import yandex_api
 import json
+import datetime
+
+from notifications import get_current_datetime
+
 
 class Text:
     def __init__(self, redis_storage):
@@ -29,6 +33,36 @@ class Text:
         dep = str(self.redis_storage.hget(user_id, 'dep_code'), 'utf-8')
         full_schedule = yandex_api.output_full_schedule(dep, arr)
         return full_schedule
+
+    def tomorrow_schedule_text(self, user_id):
+        latitude = str(self.redis_storage.hget(user_id, 'latitude'), 'utf-8')
+        longitude = str(self.redis_storage.hget(user_id, 'longitude'), 'utf-8')
+        arr = str(self.redis_storage.hget(user_id, 'arr_code'), 'utf-8')
+        dep = str(self.redis_storage.hget(user_id, 'dep_code'), 'utf-8')
+        dep_datetime = get_current_datetime(latitude, longitude)
+        dep_datetime += datetime.timedelta(days=1)
+        print(dep_datetime)
+        full_schedule = yandex_api.output_full_schedule(dep, arr, date=dep_datetime)
+        return full_schedule
+
+    def today_schedule_text(self, user_id):
+        latitude = str(self.redis_storage.hget(user_id, 'latitude'), 'utf-8')
+        longitude = str(self.redis_storage.hget(user_id, 'longitude'), 'utf-8')
+        arr = str(self.redis_storage.hget(user_id, 'arr_code'), 'utf-8')
+        dep = str(self.redis_storage.hget(user_id, 'dep_code'), 'utf-8')
+        dep_datetime = get_current_datetime(latitude, longitude)
+        full_schedule = yandex_api.nearest_full_schedule(dep, arr, date=dep_datetime)
+        return full_schedule
+
+    def nearest_schedule_text(self, user_id):
+        latitude = str(self.redis_storage.hget(user_id, 'latitude'), 'utf-8')
+        longitude = str(self.redis_storage.hget(user_id, 'longitude'), 'utf-8')
+        arr = str(self.redis_storage.hget(user_id, 'arr_code'), 'utf-8')
+        dep = str(self.redis_storage.hget(user_id, 'dep_code'), 'utf-8')
+        dep_datetime = get_current_datetime(latitude, longitude)
+        full_schedule = yandex_api.nearest_full_schedule(dep, arr, date=dep_datetime)
+        return full_schedule
+
 
     def my_routes_text(self, user_id, **kwargs):
         route_key = 'routes:' + str(user_id)
