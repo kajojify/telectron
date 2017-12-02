@@ -23,10 +23,19 @@ class Text:
 
     def main_menu_text(self, user_id, **kwargs):
         if self.redis_storage.hexists(user_id, 'routes'):
-            new_response = config.permitted_states['main_menu']['message']['routes']
+            response = config.permitted_states['main_menu']['message']['routes']
         else:
-            new_response = config.permitted_states['main_menu']['message']['no_routes']
-        return new_response
+            response = config.permitted_states['main_menu']['message']['no_routes']
+        return response
+
+    def new_route_text(self, user_id, **kwargs):
+        if not self.redis_storage.hexists(user_id, 'arr_code') and not self.redis_storage.hexists(user_id, 'dep_code'):
+            response = config.permitted_states['new_route']['message']['not_set']
+        elif self.redis_storage.hexists(user_id, 'arr_code'):
+            response = config.permitted_states['new_route']['message']['already_set_arrival']
+        elif self.redis_storage.hexists(user_id, 'dep_code'):
+            response = config.permitted_states['new_route']['message']['already_set_departure']
+        return response
 
     def entire_schedule_text(self, user_id):
         arr = str(self.redis_storage.hget(user_id, 'arr_code'), 'utf-8')
@@ -63,14 +72,13 @@ class Text:
         full_schedule = yandex_api.nearest_full_schedule(dep, arr, date=dep_datetime)
         return full_schedule
 
-
     def my_routes_text(self, user_id, **kwargs):
         route_key = 'routes:' + str(user_id)
         routes_number = self.redis_storage.llen(route_key)
         all_routes = self.redis_storage.lrange(route_key, 0, routes_number-1)
         print(all_routes)
         if not all_routes:
-            text = "Вы пока добавили ни единого маршрута!"
+            text = "Вы пока не добавили ни единого маршрута!"
         else:
             text = ''
             for i, route in enumerate(all_routes, 1):

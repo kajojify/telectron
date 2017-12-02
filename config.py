@@ -67,6 +67,11 @@ buttons = {
     'today': 'На сегодня',
     'tomorrow': 'На завтра',
     'entire': 'На все дни',
+    'every_n_minutes': 'Через n минут',
+    '5minutes': 'За 5 минут',
+    '10minutes': 'За 10 минут',
+    '30minutes': 'За 30 минут',
+    '1hout': 'За час',
     'set_notifications': emojis['bell'] + " Создать оповещение"
 }
 
@@ -109,7 +114,10 @@ permitted_states = {
     "new_route": {'keyboard': 'reply',
                   'buttons': [buttons['departure'], buttons['arrival'],
                               buttons['comeback']],
-                  'message': "Укажите *станцию отправления* и *станцию прибытия*."},
+                  'message': {'not_set': "Укажите *станцию отправления* и *станцию прибытия*.",
+                              'already_set_departure': "Укажите *станцию прибытия*.",
+                              'already_set_arrival': "Укажите *станцию отправления*."}
+                  },
 
     "my_routes": {'keyboard': 'reply',
                   'buttons': [buttons['comeback']],
@@ -141,9 +149,9 @@ permitted_states = {
                             buttons['comeback']],
                 'message': '*Станцию прибытия* будете задавать вручную или по геопозиции?'},
 
-    "already_set_arrival": {'message': 'Вы уже указали *станцию прибытия*!'},
+    "already_set_arrival": {'message': 'Вы уже указали *станцию прибытия*!\n_{}_'},
 
-    "already_set_departure": {'message': 'Вы уже указали *станцию отправления*!'},
+    "already_set_departure": {'message': 'Вы уже указали *станцию отправления*!\n_{}_'},
 
     "arrival_input": {'keyboard': 'inline',
                       'buttons': countries,
@@ -242,5 +250,14 @@ permitted_states = {
     'nearest_schedule': {'keyboard': 'reply',
                           'buttons': [buttons['set_notifications'], buttons['comeback']]},
 
-    'specific_route': {'keyboard': 'none'}
+    'specific_route': {'keyboard': 'none'},
+
+    'choose_electr': {'message': 'О каких электричках Вам напоминать?'},
+
+    'notify_me': {'keyboard': 'reply',
+                  'every_n_minutes': 'Через n минут',
+                  '5minutes': 'За 5 минут',
+                  '10minutes': 'За 10 минут',
+                  '30minutes': 'За 30 минут',
+                  '1hour': 'За час',}
     }

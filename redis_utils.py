@@ -47,8 +47,11 @@ class StateChanger:
         keyboard.add(types.InlineKeyboardButton(text='Всё равно продолжить',
                                                 callback_data='Всё равно продолжить'))
 
-
-        text = config.permitted_states[state]['message']
+        if state == 'already_set_departure':
+            station_name = str(self.redis_storage.hget(user_id, 'dep_station'), 'utf-8')
+        else:
+            station_name = str(self.redis_storage.hget(user_id, 'arr_station'), 'utf-8')
+        text = config.permitted_states[state]['message'].format(station_name)
         self.bot.send_message(user_id, text, reply_markup=keyboard, parse_mode="markdown")
 
     def specify_radius(self, user_id, state):
@@ -216,6 +219,15 @@ class StateChanger:
         state = 'specific_route'
         self.set_state(user_id, state)
         text = self.text.get_bot_text(user_id, state, route_number=route_number)
+
+        keyboard = self.keyboard.get_state_keyboard(state)
+        self.bot.send_message(user_id, text, reply_markup=keyboard,
+                              parse_mode='markdown')
+
+    def notify_me(self, user_id, electr_number):
+        state = 'notify_me'
+        self.set_state(user_id, state)
+        text = self.text.get_bot_text(user_id, state, electr_number=electr_number)
 
         keyboard = self.keyboard.get_state_keyboard(state)
         self.bot.send_message(user_id, text, reply_markup=keyboard,

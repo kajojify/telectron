@@ -55,10 +55,10 @@ def give_me_stations_by_name(station_title, region):
 
 
 def output_full_schedule(dep_st_code, arr_st_code, date=None):
-    full_schedule_str = ""
+    full_schedule_str = when = ""
     query = {'apikey': yandex_apikey, 'from': dep_st_code, 'to': arr_st_code,
              'transport_types': 'suburban'}
-    if not isinstance(date, datetime):
+    if not isinstance(date, (datetime, type(None))):
         raise TypeError('Аргумент date должен быть объектом класса datetime.datetime!')
     if date is not None:
         query['date'] = date.strftime("%Y-%m-%d")
@@ -67,19 +67,21 @@ def output_full_schedule(dep_st_code, arr_st_code, date=None):
     arr = full_schedule_json['search']['to']['title']
     all_subtrains = full_schedule_json['segments']
     for subtrain in all_subtrains:
-        departure_time = subtrain['departure'][:-6].split('T')[1]
-        # except_days = subtrain['except_days']
-        arrival_time = subtrain['arrival'][:-6].split('T')[1]
-        from_station = subtrain['from']['title']
-        to_station = subtrain['to']['title']
-        # days = subtrain['days']
         title = subtrain['thread']['title']
-        duration = subtrain['duration']
-        stops = subtrain['stops']
-        # when = '\n*Когда:* {0}'.format(days) + (', кроме {0}.\n\n'.format(except_days) if except_days else '.\n\n')
+        # stops = subtrain['stops']
+        if date is None:
+            except_days = subtrain['except_days']
+            days = subtrain['days']
+            when = '*Когда:* {0}'.format(days) + (', кроме {0}.\n\n'.format(except_days) if except_days else '.\n\n')
+            departure_time = subtrain['departure']
+            arrival_time = subtrain['arrival']
+        else:
+            departure_time = subtrain['departure'][:-6].split('T')[1]
+            arrival_time = subtrain['arrival'][:-6].split('T')[1]
         subtrain_str = "\n*Следование:* {0}\n {1}     {2}\n{3}  -  {4}\n".format(title, dep, arr, departure_time, arrival_time)
-        # subtrain_str += when
+        subtrain_str += when
         full_schedule_str += subtrain_str
+
     return full_schedule_str
 
 def nearest_full_schedule(dep_st_code, arr_st_code, date):
@@ -93,16 +95,14 @@ def nearest_full_schedule(dep_st_code, arr_st_code, date):
     dep = full_schedule_json['search']['from']['title']
     arr = full_schedule_json['search']['to']['title']
     all_subtrains = full_schedule_json['segments']
+    return all_subtrains
     for subtrain in all_subtrains:
         departure_time = datetime.strptime(subtrain['departure'][:-6], "%Y-%m-%dT%H:%M:%S")
         if date > departure_time:
             continue
-
         departure_time = subtrain['departure'][:-6].split('T')[1]
         arrival_time = subtrain['arrival'][:-6].split('T')[1]
-
         title = subtrain['thread']['title']
-
         subtrain_str = "\n*Следование:* {0}\n {1}     {2}\n{3}  -  {4}\n".format(title, dep, arr, departure_time, arrival_time)
         full_schedule_str += subtrain_str
     return full_schedule_str if full_schedule_str else 'Все уехали :)'

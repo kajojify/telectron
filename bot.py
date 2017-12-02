@@ -30,17 +30,6 @@ def my_routes(message):
     changer.go_into_state(message.from_user.id, 'my_routes')
 
 
-@bot.message_handler(func=lambda m: changer.get_state(m.from_user.id) == "my_routes" and
-                     m.text != config.buttons['comeback'])
-def specify_radius(message):
-    try:
-        route_number = int(message.text)
-    except ValueError:
-        bot.send_message(message.from_user.id, 'Неверно указан номер маршрута!\nПопробуйте снова.')
-    else:
-        changer.specific_route(message.from_user.id, route_number=route_number)
-
-
 @bot.message_handler(func=lambda m: m.text == config.buttons['notifications'] and
                      changer.get_state(m.from_user.id) == "main_menu")
 def my_routes(message):
@@ -88,6 +77,19 @@ def settings(message):
                      changer.get_state(m.from_user.id) == "additional_info")
 def settings(message):
     bot.send_message(message.from_user.id, config.additional_info['about_author'])
+
+#########################################
+############ my_routes ############
+
+@bot.message_handler(func=lambda m: changer.get_state(m.from_user.id) == "my_routes" and
+                     m.text != config.buttons['comeback'])
+def specify_radius(message):
+    try:
+        route_number = int(message.text)
+    except ValueError:
+        bot.send_message(message.from_user.id, 'Неверно указан номер маршрута!\nПопробуйте снова.')
+    else:
+        changer.specific_route(message.from_user.id, route_number=route_number)
 
 #########################################
 #########################################
@@ -298,18 +300,7 @@ def inline(c):
 
         changer.create_route(c.from_user.id, bot_response)
     else:
-        if changer.get_state(c.from_user.id) == 'sure_dep':
-            new_response = "А теперь укажите *станция отправления*."
-            changer.go_into_state(c.from_user.id, 'new_route', arbitrary_response=new_response)
-        elif changer.get_state(c.from_user.id) == 'sure_arr':
-            new_response = "А теперь укажите *станция прибытия*."
-            changer.go_into_state(c.from_user.id, 'new_route', arbitrary_response=new_response)
-        elif changer.get_state(c.from_user.id) == 'specify_departure_station':
-            new_response = "А теперь укажите *станцию прибытия*."
-            changer.go_into_state(c.from_user.id, 'new_route', arbitrary_response=new_response)
-        else:
-            new_response = "А теперь укажите *станцию отправления*."
-            changer.go_into_state(c.from_user.id, 'new_route', arbitrary_response=new_response)
+        changer.go_into_state(c.from_user.id, 'new_route')
 
 
 @bot.message_handler(func=lambda m: m.text == config.buttons['schedule'] and
@@ -340,6 +331,25 @@ def settings(message):
                      changer.get_state(m.from_user.id) == "schedule")
 def settings(message):
     changer.go_into_state(message.from_user.id, 'entire_schedule')
+
+
+@bot.message_handler(func=lambda m: m.text == config.buttons['set_notifications'] and
+                     changer.get_state(m.from_user.id) in ['nearest_schedule',
+                                                           'today_schedule',
+                                                           'tomorrow_schedule',
+                                                           'entire_schedule'])
+def notify_me(message):
+    changer.go_into_state(message.from_user.id, 'choose_electr')
+
+
+@bot.message_handler(func=lambda m: changer.get_state(m.from_user.id) == "choose_electr")
+def settings(message):
+    try:
+        electr_number = int(message.text)
+    except ValueError:
+        bot.send_message(message.from_user.id, 'Неверно указан номер маршрута!\nПопробуйте снова.')
+    else:
+        changer.notify_me(message.from_user.id, electr_number=electr_number)
 
 
 @bot.callback_query_handler(func=lambda c: c.data == 'добавить')
