@@ -9,24 +9,38 @@ from keyboard import Keyboard
 from text_changer import Text
 
 
+class Redis:
+    def __init__(self):
+        self.storage = redis.StrictRedis()
+
+    def get_str(self, user_id, key):
+        return str(self.storage.hget(user_id, key), 'utf-8')
+
+    def __getattr__(self, item):
+        return getattr(self.storage, item)
+
+
 class StateChanger:
-    def __init__(self, bot):
+    def __init__(self, bot, redis_storage):
         self.bot = bot
+        self.redis = redis_storage
         self.geo_radius = 5
         self.keyboard = Keyboard()
-        self.redis_storage = redis.StrictRedis()
-        self.text = Text(self.redis_storage)
+        self.text = Text(self.redis)
 
     def get_state(self, user_id):
-        return str(self.redis_storage.hget(user_id, 'state'), 'utf-8')
+        return self.redis.get_str(user_id, "state")
 
     def set_state(self, user_id, state):
         if state in config.permitted_states:
-            self.redis_storage.hset(str(user_id), 'state', state)
+            self.redis.hset(str(user_id), "state", state)
         else:
-            raise ValueError
+            raise ValueError("There is no such state")
 
     def go_into_state(self, user_id, state, arbitrary_response=None):
+        """
+        Standard state changer
+        """
         self.set_state(user_id, state)
 
         text = self.text.get_bot_text(user_id, state, arbitrary_response)
@@ -48,9 +62,9 @@ class StateChanger:
                                                 callback_data='Всё равно продолжить'))
 
         if state == 'already_set_departure':
-            station_name = str(self.redis_storage.hget(user_id, 'dep_station'), 'utf-8')
+            station_name = self.redis.get_str(user_id, 'dep_station')
         else:
-            station_name = str(self.redis_storage.hget(user_id, 'arr_station'), 'utf-8')
+            station_name = self.redis.get_str(user_id, 'arr_station')
         text = config.permitted_states[state]['message'].format(station_name)
         self.bot.send_message(user_id, text, reply_markup=keyboard, parse_mode="markdown")
 
@@ -80,7 +94,7 @@ class StateChanger:
     def specify_direction_region(self, user_id, state):
         self.set_state(user_id, state)
 
-        country = str(self.redis_storage.hget(user_id, 'country'), 'utf-8')
+        country = self.redis.get_str(user_id, 'country')
         country_string = "Страна: *{0}*\n".format(country)
         regions_alphabet = yandex_api.get_regions_alphabet(country)
 
@@ -94,7 +108,7 @@ class StateChanger:
 
     def direction_region(self, user_id, state, callback):
         self.set_state(user_id, state)
-        country = str(self.redis_storage.hget(user_id, 'country'), 'utf-8')
+        country = self.redis.get_str(user_id, 'country')
         desired_regions = yandex_api.give_me_regions_by_letter(callback.data, country)
 
         keyboard = self.keyboard.direction_region(desired_regions)
@@ -115,26 +129,26 @@ class StateChanger:
             chosen_station = stations[0]
             station_code = chosen_station['codes']['yandex_code']
             if self.get_state(user_id) == 'specify_arrival_station':
-                self.redis_storage.hset(user_id, 'arr_station', chosen_station['title'])
-                self.redis_storage.hset(user_id, 'arr_code', station_code)
+                self.redis.hset(user_id, 'arr_station', chosen_station['title'])
+                self.redis.hset(user_id, 'arr_code', station_code)
             else:
-                self.redis_storage.hset(user_id, 'dep_station', chosen_station['title'])
-                self.redis_storage.hset(user_id, 'dep_code', station_code)
+                self.redis.hset(user_id, 'dep_station', chosen_station['title'])
+                self.redis.hset(user_id, 'dep_code', station_code)
                 latitude, longitude = chosen_station['latitude'], chosen_station['longitude']
-                self.redis_storage.hset(user_id, 'latitude', latitude)
-                self.redis_storage.hset(user_id, 'longitude', longitude)
+                self.redis.hset(user_id, 'latitude', latitude)
+                self.redis.hset(user_id, 'longitude', longitude)
             self.sure_station(user_id, state, chosen_station['title'])
         else:
             self.clarify_direction(user_id, stations)
 
     def both_stations_set(self, user_id):
-        if self.redis_storage.hexists(user_id, 'arr_code') and self.redis_storage.hexists(user_id, 'dep_code'):
+        if self.redis.hexists(user_id, 'arr_code') and self.redis.hexists(user_id, 'dep_code'):
             return True
         else:
             return False
 
     def clarify_direction(self, user_id, stations):
-        self.redis_storage.hset(user_id, 'stations', json.dumps(stations))
+        self.redis.hset(user_id, 'stations', json.dumps(stations))
         keyboard = types.InlineKeyboardMarkup()
         keyboard.add(*[types.InlineKeyboardButton(text=station['direction'],
                                                   callback_data='D'+station['direction'])
@@ -191,11 +205,11 @@ class StateChanger:
         keyboard.add(types.InlineKeyboardButton(text='Подтвердить', callback_data='Подтвердить'))
 
         if state == 'specify_departure_station':
-            region = str(self.redis_storage.hget(user_id, 'dep_region'), 'utf-8')
+            region = self.redis.get_str(user_id, 'dep_region')
             direction = 'отправления'
         else:
             direction = 'прибытия'
-            region = str(self.redis_storage.hget(user_id, 'arr_region'), 'utf-8')
+            region = self.redis.get_str(user_id, 'arr_region')
 
         station_confirmation = "Ваша станция {0}:\n" \
                                "*регион {0}*: {1}\n" \
@@ -232,3 +246,20 @@ class StateChanger:
         keyboard = self.keyboard.get_state_keyboard(state)
         self.bot.send_message(user_id, text, reply_markup=keyboard,
                               parse_mode='markdown')
+
+
+class DataHandler:
+    def __init__(self, bot, redis_storage):
+        self.bot = bot
+        self.redis = redis_storage
+
+    def set_new_value(self, callback, key):
+        pass
+
+    def set_new_country(self, user_id, country):
+        new_country = country[3:]  # Delete a flag
+        self.redis.hset(user_id, "country", new_country)
+        self.bot.send_message(user_id, "Страна изменена."
+                              " Ваша текущая страна - {}".format(config))
+
+
